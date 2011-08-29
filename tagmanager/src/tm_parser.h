@@ -69,6 +69,7 @@ typedef enum
 	TM_PARSER_ABAQUS,
 	TM_PARSER_RUST,
 	TM_PARSER_GO,
+	TM_PARSER_M4,
 	TM_PARSER_COUNT
 } TMParserType;
 

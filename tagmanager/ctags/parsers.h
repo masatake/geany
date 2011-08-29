@@ -62,7 +62,8 @@
     AsciidocParser, \
     AbaqusParser, \
     RustParser, \
-    GoParser
+    GoParser, \
+    M4Parser
 
 #endif	/* _PARSERS_H */
 
