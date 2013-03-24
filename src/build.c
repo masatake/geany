@@ -720,8 +720,11 @@ static void parse_build_output(const gchar **output, gint status)
  * as well as nested sub-commands (with `` and $(), up to 16 levels).  It makes sure the
  * placeholder replacements are properly quoted.
  * 
+ * If @quote is FALSE, it only replaces placeholders without adding any quoting.  This is
+ * useful if replacing placeholders in a non-shell string, like working directory.
+ *
  * Returns: an UTF-8 string with placeholders replaced. */
-static gchar *build_replace_placeholder(const GeanyDocument *doc, const gchar *src)
+static gchar *build_replace_placeholder(const GeanyDocument *doc, const gchar *src, gboolean quote)
 {
 	GString *stack;
 	struct {
@@ -756,11 +759,14 @@ static gchar *build_replace_placeholder(const GeanyDocument *doc, const gchar *s
 	if (app->project)
 		p = project_get_base_path();
 
-	/* quote the replacements */
-	if (f) SETPTR(f, g_shell_quote(f));
-	if (d) SETPTR(d, g_shell_quote(d));
-	if (e) SETPTR(e, g_shell_quote(e));
-	if (p) SETPTR(p, g_shell_quote(p));
+	if (quote)
+	{
+		/* quote the replacements */
+		if (f) SETPTR(f, g_shell_quote(f));
+		if (d) SETPTR(d, g_shell_quote(d));
+		if (e) SETPTR(e, g_shell_quote(e));
+		if (p) SETPTR(p, g_shell_quote(p));
+	}
 
 	stack = g_string_new(NULL);
 	for (; *src; src++)
@@ -810,7 +816,7 @@ static gchar *build_replace_placeholder(const GeanyDocument *doc, const gchar *s
 
 			case '%':
 				src++;
-				if (nesting[level].quote) /* close the quote */
+				if (quote && nesting[level].quote) /* close the quote */
 					g_string_append_c(stack, nesting[level].quote);
 				if (*src == 'f' && f)
 					g_string_append(stack, f);
@@ -836,7 +842,7 @@ static gchar *build_replace_placeholder(const GeanyDocument *doc, const gchar *s
 					g_string_append_c(stack, '%');
 					g_string_append_c(stack, *src);
 				}
-				if (nesting[level].quote) /* re-open quote */
+				if (quote && nesting[level].quote) /* re-open quote */
 					g_string_append_c(stack, nesting[level].quote);
 				break;
 
@@ -977,11 +983,11 @@ static gchar *prepare_run_script(GeanyDocument *doc, gchar **vte_cmd_nonscript, 
 
 	cmd = get_build_cmd(doc, GEANY_GBG_EXEC, cmdindex, NULL);
 
-	cmd_string = build_replace_placeholder(doc, cmd->command);
+	cmd_string = build_replace_placeholder(doc, cmd->command, TRUE);
 	cmd_working_dir =  cmd->working_dir;
 	if (EMPTY(cmd_working_dir))
 		cmd_working_dir = "%d";
-	working_dir = build_replace_placeholder(doc, cmd_working_dir); /* in utf-8 */
+	working_dir = build_replace_placeholder(doc, cmd_working_dir, FALSE); /* in utf-8 */
 
 	/* only test whether working dir exists, don't change it or else Windows support will break
 	 * (gspawn-win32-helper.exe is used by GLib and must be in $PATH which means current working
@@ -1429,8 +1435,8 @@ static void build_command(GeanyDocument *doc, GeanyBuildGroup grp, guint cmd, gc
 	else
 		full_command = cmdstr;
 
-	dir = build_replace_placeholder(doc, buildcmd->working_dir);
-	subs_command = build_replace_placeholder(doc, full_command);
+	dir = build_replace_placeholder(doc, buildcmd->working_dir, FALSE);
+	subs_command = build_replace_placeholder(doc, full_command, TRUE);
 	build_info.grp = grp;
 	build_info.cmd = cmd;
 	build_spawn_cmd(doc, subs_command, dir);
